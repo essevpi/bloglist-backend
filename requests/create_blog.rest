@@ -7,3 +7,36 @@ Content-Type: application/json
     "url": "example_url",
     "likes": 5
 }
+
+###
+#Post a blog without like key (will default to 0)
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "title": "Blog with no likes",
+    "author": "Simone",
+    "url": "example_url3"
+}
+
+###
+#Post a blog without title key (rejected)
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "author": "Simone",
+    "url": "example_url3",
+    "likes": 5
+}
+
+###
+#Post a blog without url key (rejected)
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "title": "Blog with no likes",
+    "author": "Simone",
+    "likes": 5
+}
