@@ -1,37 +1,47 @@
+###Post a Blog (with auth token)
 POST http://localhost:3003/api/blogs
 Content-Type: application/json
+Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkQwMGQiLCJpZCI6IjYxMzAxMGEzZWQ1MjVjMjcyYzAwYzc1NSIsImlhdCI6MTYzMDYyODE1NiwiZXhwIjoxNjMwNjMxNzU2fQ.VUHSaym59LGbSmAw3i3vg3AVVv-Mn0gdEi9tfX6uXns
 
 {
-    "title": "My first blog",
-    "author": "Simone",
+    "title": "Blog posted with Auth Token by D00d",
+    "author": "D00d",
     "url": "example_url",
-    "likes": 5
+    "likes": 50
 }
 
-###
-#Post a blog without like key (will default to 0)
+### Post a blog without auth token
 POST http://localhost:3003/api/blogs
 Content-Type: application/json
 
 {
     "title": "Blog with no likes",
     "author": "Simone",
-    "url": "example_url3"
+    "url": "example_url",
+    "likes": 5
 }
 
-###
-#Post a blog without title key (rejected)
+### Post a blog without like key (will default to 0)
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "title": "Blog with no likes",
+    "author": "Simone",
+    "url": "example_url"
+}
+
+### Post a blog without title key (rejected)
 POST http://localhost:3003/api/blogs
 Content-Type: application/json
 
 {
     "author": "Simone",
-    "url": "example_url3",
+    "url": "example_url",
     "likes": 5
 }
 
-###
-#Post a blog without url key (rejected)
+### Post a blog without url key (rejected)
 POST http://localhost:3003/api/blogs
 Content-Type: application/json
 

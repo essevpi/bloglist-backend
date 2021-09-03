@@ -3,19 +3,39 @@ const supertest = require('supertest');
 const app = require('../app');
 const api = supertest(app);
 const Blog = require('../models/blog');
+const User = require('../models/user');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const helper = require('./blog_api_test_helper');
 
-beforeEach(async () => {
-    await Blog.deleteMany({});
-
-    const blogObjects = helper.initialBlogs
-        .map(b => new Blog(b));
-
-    const promiseArray = blogObjects.map(b => b.save());
-    await Promise.all(promiseArray);
-});
+let userToken;
 
 describe('blogs',  () => {
+    beforeEach(async () => {
+        await Blog.deleteMany({});
+        await User.deleteMany({});
+
+        const testUser = new User ({
+            username: 'Test_d00d',
+            password: 'testpw'
+        });
+
+        await testUser.save();
+
+        const userForToken = {
+            username: testUser.username,
+            id: testUser._id
+        };
+
+        userToken = jwt.sign(userForToken, process.env.SECRET);
+
+        await Promise.all(
+            helper.initialBlogs.map((blog) => {
+                blog.user = testUser.id;
+                return new Blog(blog).save();
+            })
+        );
+    });
     test('are in JSON format', async () => {
         await api
             .get('/api/blogs')
@@ -32,7 +52,6 @@ describe('blogs',  () => {
     test('identifier is defined as id', async () => {
         const blogs = await helper.blogsInDb();
         const isDef = Object.prototype.hasOwnProperty.call(blogs[0], 'id');
-        //console.log('isDef ? ', isDef);
         expect(isDef).toBeDefined();
     });
 
@@ -47,6 +66,7 @@ describe('blogs',  () => {
         await api
             .post('/api/blogs')
             .send(blogToAdd)
+            .set('Authorization', `bearer ${userToken}`)
             .expect(200)
             .expect('Content-Type', /application\/json/);
 
@@ -68,6 +88,7 @@ describe('blogs',  () => {
         await api
             .post('/api/blogs')
             .send(blogToAdd)
+            .set('Authorization', `bearer ${userToken}`)
             .expect(200)
             .expect('Content-Type', /application\/json/);
 
@@ -102,6 +123,7 @@ describe('blogs',  () => {
 
         await api
             .delete(`/api/blogs/${blogToDel.id}`)
+            .set('Authorization', `bearer ${userToken}`)
             .expect(204);
 
         const blogsAtEnd = await helper.blogsInDb();
@@ -128,15 +150,128 @@ describe('blogs',  () => {
     test('can get a single blog', async () =>  {
         const blogs = await helper.blogsInDb();
         const blogToTest = blogs[0];
-        //console.log(blogToTest.id);
         const returnedBlog = await api
             .get(`/api/blogs/${blogToTest.id}`)
             .expect(200)
             .expect('Content-Type', /application\/json/);
-        console.log(returnedBlog.id);
-        const parsedBlog = JSON.parse(JSON.stringify(blogToTest));
 
+        const parsedBlog = JSON.parse(JSON.stringify(blogToTest));
         expect(returnedBlog.body).toEqual(parsedBlog);
+    });
+});
+
+describe('users', () => {
+    beforeEach(async () => {
+        await User.deleteMany({});
+
+        const passwordHash = await bcrypt.hash('sekret', 10);
+        const user = new User({ username: 'root', passwordHash });
+
+        await user.save();
+    });
+
+    test('can be created', async () => {
+        const usersAtStart = await helper.usersInDb();
+
+        const newUser = {
+            username: 'test_user',
+            name: 'Test User',
+            password: 'testpassword'
+        };
+
+        await api
+            .post('/api/users')
+            .send(newUser)
+            .expect(200)
+            .expect('Content-Type', /application\/json/);
+
+        const usersAtEnd = await helper.usersInDb();
+        expect(usersAtEnd).toHaveLength(usersAtStart.length + 1);
+
+        const usernames = usersAtEnd.map(u => u.username);
+        expect(usernames).toContain(newUser.username);
+    });
+
+    test('are not created if username already exists', async () => {
+        const usersAtStart = await helper.usersInDb();
+
+        const newUser = {
+            username: 'root',
+            name: 'Test User',
+            password: 'testpassword'
+        };
+
+        const result = await api
+            .post('/api/users')
+            .send(newUser)
+            .expect(400)
+            .expect('Content-Type', /application\/json/);
+
+        expect(result.body.error).toContain('`username` to be unique');
+
+        const usersAtEnd = await helper.usersInDb();
+        expect(usersAtEnd).toHaveLength(usersAtStart.length);
+    });
+
+    test('are not created if username is missing', async () => {
+        const usersAtStart = await helper.usersInDb();
+
+        const newUser = {
+            name: 'Test User',
+            password: 'testpassword'
+        };
+
+        const result = await api
+            .post('/api/users')
+            .send(newUser)
+            .expect(400)
+            .expect('Content-Type', /application\/json/);
+
+        expect(result.body.error).toContain('`username` is required');
+
+        const usersAtEnd = await helper.usersInDb();
+        expect(usersAtEnd).toHaveLength(usersAtStart.length);
+    });
+
+    test('are not created if password is missing', async () => {
+        const usersAtStart = await helper.usersInDb();
+
+        const newUser = {
+            username: 'test_user',
+            name: 'Test User'
+        };
+
+        const result = await api
+            .post('/api/users')
+            .send(newUser)
+            .expect(400)
+            .expect('Content-Type', /application\/json/);
+
+        expect(result.body.error).toContain('password must be given');
+
+        const usersAtEnd = await helper.usersInDb();
+        expect(usersAtEnd).toHaveLength(usersAtStart.length);
+    });
+
+    test('are not created if password length is < 3', async () => {
+        const usersAtStart = await helper.usersInDb();
+
+        const newUser = {
+            username: 'test_user',
+            name: 'Test User',
+            password: 'pw'
+        };
+
+        const result = await api
+            .post('/api/users')
+            .send(newUser)
+            .expect(400)
+            .expect('Content-Type', /application\/json/);
+
+        expect(result.body.error).toContain('password must be at least 3 characters long');
+
+        const usersAtEnd = await helper.usersInDb();
+        expect(usersAtEnd).toHaveLength(usersAtStart.length);
     });
 });
 
