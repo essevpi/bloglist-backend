@@ -44,7 +44,7 @@ blogsRouter.post('/', auth, async (req, res, next) => {
             });
         }
 
-        const blog = new Blog ({
+        let blog = new Blog ({
             title: req.body.title,
             author: req.body.author,
             url: req.body.url,
@@ -53,8 +53,11 @@ blogsRouter.post('/', auth, async (req, res, next) => {
         });
 
         const savedBlog = await blog.save();
+
         req.user.blogs = req.user.blogs.concat(savedBlog._id);
         await req.user.save();
+
+        blog = await Blog.findById(blog._id).populate('user', { username: 1, name: 1 });
 
         res.status(200).json(blog);
     } catch (exception) {
@@ -94,7 +97,9 @@ blogsRouter.put('/:id', async (request, response, next) => {
     };
 
     try {
-        const updatedBlog = await Blog.findByIdAndUpdate(request.params.id, blog, { new: true });
+        const updatedBlog = await Blog
+            .findByIdAndUpdate(request.params.id, blog, { new: true })
+            .populate('user', { username: 1, name: 1 });
         return response.json(updatedBlog);
     } catch (exception) {
         next(exception);
